@@ -2,6 +2,8 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 
 ## Getting Started
 
+go run github.com/steebchen/prisma-client-go migrate dev --name your_change_name
+
 First, run the development server:
 
 ```bash

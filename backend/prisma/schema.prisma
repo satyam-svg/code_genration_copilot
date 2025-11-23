@@ -1,0 +1,70 @@
+generator client {
+  provider = "go run github.com/steebchen/prisma-client-go"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id          Int          @id @default(autoincrement())
+  name        String
+  email       String       @unique
+  password    String       
+  createdAt   DateTime     @default(now()) @map("created_at")
+  generations Generation[]
+  chats       Chat[]
+
+  @@map("users")
+}
+
+model Language {
+  id          Int          @id @default(autoincrement())
+  name        String       @unique
+  generations Generation[]
+
+  @@map("languages")
+}
+
+model Generation {
+  id          Int       @id @default(autoincrement())
+  prompt      String
+  code        String    @db.Text
+  createdAt   DateTime  @default(now()) @map("created_at")
+  user        User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  userId      Int?      @map("user_id")
+  language    Language  @relation(fields: [languageId], references: [id], onDelete: Restrict)
+  languageId  Int       @map("language_id")
+
+  @@index([createdAt])
+  @@index([languageId, createdAt])
+  @@index([userId, createdAt])
+  @@map("generations")
+}
+
+model Chat {
+  id        Int       @id @default(autoincrement())
+  title     String    @default("New Chat")
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    Int       @map("user_id")
+  messages  Message[]
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  @@index([userId, updatedAt])
+  @@map("chats")
+}
+
+model Message {
+  id        Int      @id @default(autoincrement())
+  chat      Chat     @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  chatId    Int      @map("chat_id")
+  role      String   // "user" or "assistant"
+  content   String   @db.Text
+  language  String?  // Programming language for code messages
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([chatId, createdAt])
+  @@map("messages")
+}
