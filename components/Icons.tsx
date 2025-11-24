@@ -28,4 +28,6 @@ export {
   Sparkles as AIIcon, // Aliasing Sparkles as AIIcon as requested
   Menu,
   X,
+  LogOut,
 } from "lucide-react";
+

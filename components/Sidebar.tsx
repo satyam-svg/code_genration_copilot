@@ -14,10 +14,12 @@ import {
   Plus,
   ChevronDown,
   ChevronUp,
+  LogOut,
 } from "./Icons";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { AuthService } from "@/lib/api";
+import { useRouter } from "next/navigation";
 
 interface Chat {
   id: number;
@@ -44,6 +46,7 @@ export default function Sidebar({ currentChatId, onChatSelect, isOpen, onClose }
   const [user, setUser] = useState<User | null>(null);
   const [chats, setChats] = useState<Chat[]>([]);
   const [isChatsExpanded, setIsChatsExpanded] = useState(true);
+  const router = useRouter();
 
   useEffect(() => {
     const userData = AuthService.getUser();
@@ -74,6 +77,13 @@ export default function Sidebar({ currentChatId, onChatSelect, isOpen, onClose }
 
   const handleNewChat = () => {
     onChatSelect(null);
+  };
+
+  const handleLogout = () => {
+    // Clear authentication data
+    AuthService.logout();
+    // Redirect to home page (login page)
+    router.push('/');
   };
 
   const navItems = [
@@ -205,6 +215,15 @@ export default function Sidebar({ currentChatId, onChatSelect, isOpen, onClose }
               {item.label}
             </Link>
           ))}
+          
+          {/* Logout Button */}
+          <button
+            onClick={handleLogout}
+            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-700 dark:hover:text-red-300 transition-all duration-200 hover:shadow-sm"
+          >
+            <LogOut size={20} />
+            Logout
+          </button>
         </div>
       </nav>
 
