@@ -13,6 +13,7 @@ import {
   Paperclip,
   ArrowUp,
   AIIcon,
+  Menu,
 } from "./Icons";
 
 interface Message {
@@ -27,9 +28,10 @@ interface Message {
 interface ChatAreaProps {
   currentChatId: number | null;
   onChatCreated?: (chatId: number) => void;
+  onMenuClick?: () => void;
 }
 
-export default function ChatArea({ currentChatId, onChatCreated }: ChatAreaProps) {
+export default function ChatArea({ currentChatId, onChatCreated, onMenuClick }: ChatAreaProps) {
 
   const [user, setUser] = useState<User | null>(null);
   const [chatTitle, setChatTitle] = useState<string>("");
@@ -160,15 +162,26 @@ export default function ChatArea({ currentChatId, onChatCreated }: ChatAreaProps
   };
 
   return (
-    <div className="flex-1 flex flex-col bg-white dark:bg-zinc-900 transition-colors">
+    <div className="flex-1 flex flex-col bg-white dark:bg-zinc-900 transition-colors overflow-x-hidden w-full">
       {/* Header */}
-      <header className="h-16 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between px-6 flex-shrink-0 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-sm transition-colors">
-        <div className="flex items-center gap-2 text-sm font-medium text-zinc-900 dark:text-zinc-100">
-          <span className="text-zinc-500 dark:text-zinc-400">Code Generation</span>
-          <span className="text-zinc-300 dark:text-zinc-600">/</span>
-          <span className="bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent font-semibold">
-            {currentChatId && chatTitle ? chatTitle : "New Chat"}
-          </span>
+      <header className="h-16 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between px-4 md:px-6 flex-shrink-0 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-sm transition-colors">
+        <div className="flex items-center gap-3">
+          {/* Burger Menu Button - Only visible on mobile */}
+          <button
+            onClick={onMenuClick}
+            className="lg:hidden text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors p-2 -ml-2"
+            aria-label="Toggle menu"
+          >
+            <Menu size={24} />
+          </button>
+          
+          <div className="flex items-center gap-2 text-sm font-medium text-zinc-900 dark:text-zinc-100">
+            <span className="hidden sm:inline text-zinc-500 dark:text-zinc-400">Code Generation</span>
+            <span className="hidden sm:inline text-zinc-300 dark:text-zinc-600">/</span>
+            <span className="bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent font-semibold truncate max-w-[200px] sm:max-w-none">
+              {currentChatId && chatTitle ? chatTitle : "New Chat"}
+            </span>
+          </div>
         </div>
         <div className="flex items-center gap-3">
           <button className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors">
@@ -179,7 +192,7 @@ export default function ChatArea({ currentChatId, onChatCreated }: ChatAreaProps
       </header>
 
       {/* Messages Area */}
-      <div className="flex-1 overflow-y-auto custom-scrollbar">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar w-full">
         {/* Loading Chat State */}
         {isLoadingChat && (
           <div className="flex flex-col items-center justify-center h-full text-center space-y-6 p-6">
@@ -232,7 +245,7 @@ export default function ChatArea({ currentChatId, onChatCreated }: ChatAreaProps
         )}
 
         {!isLoadingChat && !chatLoadError && messages.length > 0 && (
-          <div className="max-w-4xl mx-auto py-6 space-y-6 px-4">
+          <div className="max-w-full md:max-w-4xl mx-auto py-4 md:py-6 space-y-4 md:space-y-6 px-3 md:px-4 w-full">
             {messages.map((msg, index) => (
               <div
                 key={msg.id || index}
@@ -246,9 +259,9 @@ export default function ChatArea({ currentChatId, onChatCreated }: ChatAreaProps
                   </div>
                 )}
 
-                <div className={`flex-1 ${msg.role === "user" ? "max-w-2xl" : ""}`}>
+                <div className={`flex-1 min-w-0 ${msg.role === "user" ? "max-w-2xl" : "max-w-full"}`}>
                   <div
-                    className={`rounded-2xl p-4 transition-all duration-200 ${
+                    className={`rounded-2xl p-3 md:p-4 transition-all duration-200 overflow-hidden ${
                       msg.role === "user"
                         ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white ml-auto shadow-lg shadow-blue-200/50"
                         : "bg-gradient-to-br from-zinc-50 to-zinc-100/50 dark:from-zinc-800 dark:to-zinc-800/50 border border-zinc-200/80 dark:border-zinc-700/80 shadow-sm"
@@ -256,13 +269,13 @@ export default function ChatArea({ currentChatId, onChatCreated }: ChatAreaProps
                   >
                     {msg.role === "assistant" ? (
                       <div>
-                        <div className="flex items-center justify-between mb-3">
-                          <span className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide">
+                        <div className="flex items-center justify-between mb-3 gap-2">
+                          <span className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wide truncate">
                             Generated Code {msg.language && `(${msg.language})`}
                           </span>
                           <button
                             onClick={() => handleCopyCode(msg.content)}
-                            className="text-xs bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-3 py-1.5 rounded-lg transition-all duration-200 shadow-sm hover:shadow-md font-medium"
+                            className="text-xs bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-3 py-1.5 rounded-lg transition-all duration-200 shadow-sm hover:shadow-md font-medium flex-shrink-0"
                           >
                             Copy
                           </button>
@@ -273,19 +286,24 @@ export default function ChatArea({ currentChatId, onChatCreated }: ChatAreaProps
                           customStyle={{
                             margin: 0,
                             borderRadius: '0.75rem',
-                            padding: '1rem',
+                            padding: '0.5rem',
                             backgroundColor: '#18181b', // zinc-900
                             whiteSpace: 'pre-wrap',
                             wordBreak: 'break-word',
+                            overflowWrap: 'break-word',
                             maxWidth: '100%',
+                            width: '100%',
+                            fontSize: '0.75rem',
+                            overflowX: 'auto',
                           }}
                           wrapLongLines={true}
+                          showLineNumbers={false}
                         >
                           {msg.content}
                         </SyntaxHighlighter>
                       </div>
                     ) : (
-                      <p className="text-sm whitespace-pre-wrap leading-relaxed">
+                      <p className="text-sm whitespace-pre-wrap leading-relaxed break-words overflow-wrap-anywhere">
                         {msg.content}
                       </p>
                     )}
@@ -303,7 +321,7 @@ export default function ChatArea({ currentChatId, onChatCreated }: ChatAreaProps
         )}
 
         {isLoading && (
-          <div className="flex items-center gap-4 max-w-4xl mx-auto py-6 px-4 animate-fadeIn">
+          <div className="flex items-center gap-4 max-w-4xl mx-auto py-4 md:py-6 px-3 md:px-4 animate-fadeIn">
             <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center shadow-md">
               <AIIcon size={18} className="text-white" />
             </div>
@@ -322,7 +340,7 @@ export default function ChatArea({ currentChatId, onChatCreated }: ChatAreaProps
       </div>
 
       {error && (
-        <div className="px-6 pb-2">
+        <div className="px-3 md:px-6 pb-2">
           <div className="max-w-4xl mx-auto bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm shadow-sm">
             {error}
           </div>
@@ -330,8 +348,8 @@ export default function ChatArea({ currentChatId, onChatCreated }: ChatAreaProps
       )}
 
       {/* Input Area */}
-      <div className="p-6 pt-4 bg-gradient-to-t from-zinc-50/50 to-transparent">
-        <div className="max-w-4xl mx-auto bg-white dark:bg-zinc-800 border-2 border-zinc-200 dark:border-zinc-700 hover:border-blue-300 dark:hover:border-blue-600 focus-within:border-blue-500 dark:focus-within:border-blue-500 rounded-2xl shadow-lg transition-all duration-200 p-2 flex items-end gap-2">
+      <div className="p-3 md:p-6 pt-3 md:pt-4 bg-gradient-to-t from-zinc-50/50 to-transparent w-full">
+        <div className="max-w-full md:max-w-4xl mx-auto bg-white dark:bg-zinc-800 border-2 border-zinc-200 dark:border-zinc-700 hover:border-blue-300 dark:hover:border-blue-600 focus-within:border-blue-500 dark:focus-within:border-blue-500 rounded-2xl shadow-lg transition-all duration-200 p-2 flex items-end gap-2">
           <div className="flex-1">
             <textarea
               value={prompt}
@@ -344,23 +362,23 @@ export default function ChatArea({ currentChatId, onChatCreated }: ChatAreaProps
             />
             <div className="flex items-center justify-between px-2 pb-1">
               <div className="flex items-center gap-1">
-                <button className="p-2 text-zinc-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all duration-200">
+                <button className="p-2 text-zinc-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all duration-200 hidden sm:block">
                   <Mic size={18} />
                 </button>
-                <button className="p-2 text-zinc-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all duration-200">
+                <button className="p-2 text-zinc-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all duration-200 hidden sm:block">
                   <Volume2 size={18} />
                 </button>
-                <button className="p-2 text-zinc-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all duration-200">
+                <button className="p-2 text-zinc-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all duration-200 hidden sm:block">
                   <Camera size={18} />
                 </button>
-                <button className="p-2 text-zinc-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all duration-200">
+                <button className="p-2 text-zinc-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all duration-200 hidden sm:block">
                   <Paperclip size={18} />
                 </button>
               </div>
               <select
                 value={language}
                 onChange={(e) => setLanguage(e.target.value)}
-                className="bg-gradient-to-r from-zinc-50 to-zinc-100 border border-zinc-200 text-zinc-700 text-xs rounded-lg px-3 py-2 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all cursor-pointer font-medium"
+                className="bg-gradient-to-r from-zinc-50 to-zinc-100 border border-zinc-200 text-zinc-700 text-xs rounded-lg px-2 md:px-3 py-2 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all cursor-pointer font-medium"
                 disabled={isLoading}
               >
                 <option value="python">Python</option>

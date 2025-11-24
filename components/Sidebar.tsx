@@ -36,9 +36,11 @@ interface User {
 interface SidebarProps {
   currentChatId: number | null;
   onChatSelect: (chatId: number | null) => void;
+  isOpen: boolean;
+  onClose: () => void;
 }
 
-export default function Sidebar({ currentChatId, onChatSelect }: SidebarProps) {
+export default function Sidebar({ currentChatId, onChatSelect, isOpen, onClose }: SidebarProps) {
   const [user, setUser] = useState<User | null>(null);
   const [chats, setChats] = useState<Chat[]>([]);
   const [isChatsExpanded, setIsChatsExpanded] = useState(true);
@@ -86,7 +88,25 @@ export default function Sidebar({ currentChatId, onChatSelect }: SidebarProps) {
   ];
 
   return (
-    <aside className="w-64 h-screen bg-gradient-to-br from-zinc-50 to-zinc-100/50 dark:from-zinc-900 dark:to-zinc-800/50 border-r border-zinc-200/80 dark:border-zinc-700/80 flex flex-col flex-shrink-0 backdrop-blur-sm transition-colors">
+    <>
+      {/* Mobile Backdrop */}
+      {isOpen && (
+        <div 
+          className="fixed inset-0 bg-black/50 z-40 lg:hidden transition-opacity"
+          onClick={onClose}
+        />
+      )}
+      
+      {/* Sidebar */}
+      <aside className={`
+        fixed lg:relative
+        w-64 h-screen 
+        bg-gradient-to-br from-zinc-50 to-zinc-100/50 dark:from-zinc-900 dark:to-zinc-800/50 
+        border-r border-zinc-200/80 dark:border-zinc-700/80 
+        flex flex-col flex-shrink-0 backdrop-blur-sm transition-all duration-300 ease-in-out
+        z-50
+        ${isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+      `}>
       {/* Header */}
       <div className="p-6 flex items-center justify-between border-b border-zinc-200/50 dark:border-zinc-700/50">
         <div className="flex items-center gap-2">
@@ -97,7 +117,10 @@ export default function Sidebar({ currentChatId, onChatSelect }: SidebarProps) {
             Copyzen
           </span>
         </div>
-        <button className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors">
+        <button 
+          onClick={onClose}
+          className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors lg:hidden"
+        >
           <PanelLeftClose size={20} />
         </button>
       </div>
@@ -202,5 +225,6 @@ export default function Sidebar({ currentChatId, onChatSelect }: SidebarProps) {
         </div>
       </div>
     </aside>
+    </>
   );
 }

@@ -26,4 +26,6 @@ export {
   Sun,
   Moon,
   Sparkles as AIIcon, // Aliasing Sparkles as AIIcon as requested
+  Menu,
+  X,
 } from "lucide-react";
