@@ -197,6 +197,299 @@ Stores individual messages within chat sessions.
 - DATETIME for temporal data
 - INT for identifiers
 
+---
+
+## 📊 Database Performance Analysis
+
+### Time Complexity of Paginated Retrieval
+
+#### Query Example: Fetch Generations with Pagination
+```sql
+SELECT * FROM generations 
+WHERE user_id = ? 
+ORDER BY created_at DESC 
+LIMIT 20 OFFSET 0;
+```
+
+#### Time Complexity Analysis
+
+**Without Index:**
+- **Time Complexity**: `O(n)` where n = total rows in table
+- **Why?** Database must scan entire table to find matching rows, then sort them
+- **Performance**: Degrades linearly as table grows
+- **Example**: 1M rows → ~1M row scans
+
+**With Composite Index `(user_id, created_at)`:**
+- **Time Complexity**: `O(log n + k)` where:
+  - `n` = total rows in table
+  - `k` = number of rows returned (LIMIT)
+- **Why?** 
+  - `O(log n)` → B-tree index lookup to find first matching row
+  - `O(k)` → Sequential read of k rows (already sorted in index)
+- **Performance**: Logarithmic lookup + constant retrieval
+- **Example**: 1M rows → ~20 comparisons + 20 row reads
+
+#### Pagination Performance
+
+| Scenario | Without Index | With Index `(user_id, created_at)` |
+|----------|---------------|-------------------------------------|
+| **First Page** (OFFSET 0) | O(n) | O(log n + k) |
+| **Middle Page** (OFFSET 1000) | O(n) | O(log n + k + offset) |
+| **Last Page** (OFFSET 10000) | O(n) | O(log n + k + offset) |
+
+**Note**: Large OFFSETs can still be slow even with indexes because PostgreSQL must skip rows. For better performance with deep pagination, use **cursor-based pagination**:
+
+```sql
+-- Instead of OFFSET
+SELECT * FROM generations 
+WHERE user_id = ? AND created_at < ?
+ORDER BY created_at DESC 
+LIMIT 20;
+```
+
+---
+
+### How Schema Affects Query Performance
+
+#### 1. **Normalization Trade-offs**
+
+**✅ Benefits:**
+- Reduces data redundancy
+- Maintains data integrity
+- Smaller table sizes
+
+**⚠️ Costs:**
+- Requires JOINs for related data
+- More complex queries
+
+**Example Query:**
+```sql
+-- Fetch generation with user and language details
+SELECT g.*, u.name as user_name, l.name as language_name
+FROM generations g
+LEFT JOIN users u ON g.user_id = u.id
+INNER JOIN languages l ON g.language_id = l.id
+WHERE g.id = ?;
+```
+
+**Performance Impact:**
+- **Without Foreign Key Indexes**: O(n × m) - Nested loop join
+- **With Foreign Key Indexes**: O(log n + log m) - Index-based join
+- **Our Schema**: ✅ Has indexes on `user_id` and `language_id`
+
+#### 2. **Composite Indexes for Query Patterns**
+
+Our schema uses composite indexes to optimize common queries:
+
+**Index: `(user_id, created_at)`**
+```sql
+-- ✅ OPTIMIZED: Uses index for both filter and sort
+SELECT * FROM generations 
+WHERE user_id = 123 
+ORDER BY created_at DESC;
+
+-- ✅ OPTIMIZED: Uses index for filter
+SELECT * FROM generations 
+WHERE user_id = 123;
+
+-- ❌ NOT OPTIMIZED: Cannot use this index (wrong column order)
+SELECT * FROM generations 
+WHERE created_at > '2024-01-01';
+```
+
+**Index: `(language_id, created_at)`**
+```sql
+-- ✅ OPTIMIZED: Filter by language and sort by time
+SELECT * FROM generations 
+WHERE language_id = 1 
+ORDER BY created_at DESC;
+```
+
+#### 3. **Flexible Querying**
+
+**Single-Column Indexes:**
+- `created_at` - Allows sorting all generations by time
+- Supports queries without user/language filters
+
+**Composite Indexes:**
+- `(user_id, created_at)` - User-specific queries with time sorting
+- `(language_id, created_at)` - Language-specific queries with time sorting
+- `(chat_id, created_at)` - Chat message retrieval in order
+
+This multi-index strategy provides **query flexibility** while maintaining **performance**.
+
+---
+
+### When Are Indexes Useful?
+
+#### ✅ Indexes ARE Useful For:
+
+1. **WHERE Clauses**
+   ```sql
+   WHERE user_id = 123  -- Uses index on user_id
+   WHERE email = 'user@example.com'  -- Uses unique index on email
+   ```
+
+2. **ORDER BY Clauses**
+   ```sql
+   ORDER BY created_at DESC  -- Uses index on created_at
+   ```
+
+3. **JOIN Operations**
+   ```sql
+   JOIN users ON generations.user_id = users.id  -- Uses index on user_id
+   ```
+
+4. **Foreign Key Constraints**
+   - Speeds up referential integrity checks
+   - Optimizes CASCADE/RESTRICT operations
+
+5. **UNIQUE Constraints**
+   ```sql
+   email UNIQUE  -- Prevents duplicates efficiently
+   ```
+
+#### ❌ Indexes Are NOT Useful For:
+
+1. **Small Tables** (< 1000 rows)
+   - Full table scan is faster than index lookup
+
+2. **High Cardinality Columns with Frequent Updates**
+   - Index maintenance overhead > query benefit
+
+3. **Columns Not Used in Queries**
+   - Wastes storage and slows down INSERT/UPDATE
+
+4. **Full Table Scans**
+   ```sql
+   SELECT * FROM generations;  -- No WHERE/ORDER BY
+   ```
+
+---
+
+### Indexes Created in Our Schema
+
+#### **generations** Table
+
+| Index | Type | Columns | Purpose | Query Pattern |
+|-------|------|---------|---------|---------------|
+| PRIMARY | B-tree | `id` | Unique identification | `WHERE id = ?` |
+| INDEX | B-tree | `created_at` | Time-based sorting | `ORDER BY created_at` |
+| COMPOSITE | B-tree | `(user_id, created_at)` | User's generations by time | `WHERE user_id = ? ORDER BY created_at` |
+| COMPOSITE | B-tree | `(language_id, created_at)` | Language-specific generations | `WHERE language_id = ? ORDER BY created_at` |
+
+**Example Queries Optimized:**
+```sql
+-- ✅ Uses (user_id, created_at) index
+SELECT * FROM generations 
+WHERE user_id = 123 
+ORDER BY created_at DESC 
+LIMIT 20;
+
+-- ✅ Uses (language_id, created_at) index
+SELECT * FROM generations 
+WHERE language_id = 1 
+ORDER BY created_at DESC;
+
+-- ✅ Uses created_at index
+SELECT * FROM generations 
+ORDER BY created_at DESC 
+LIMIT 100;
+```
+
+#### **chats** Table
+
+| Index | Type | Columns | Purpose | Query Pattern |
+|-------|------|---------|---------|---------------|
+| PRIMARY | B-tree | `id` | Unique identification | `WHERE id = ?` |
+| COMPOSITE | B-tree | `(user_id, updated_at)` | User's recent chats | `WHERE user_id = ? ORDER BY updated_at DESC` |
+
+**Why `updated_at` instead of `created_at`?**
+- Chats are sorted by **last activity** (most recent message)
+- `updated_at` changes when new messages are added
+- Provides better UX (recent conversations first)
+
+#### **messages** Table
+
+| Index | Type | Columns | Purpose | Query Pattern |
+|-------|------|---------|---------|---------------|
+| PRIMARY | B-tree | `id` | Unique identification | `WHERE id = ?` |
+| COMPOSITE | B-tree | `(chat_id, created_at)` | Chat messages in order | `WHERE chat_id = ? ORDER BY created_at` |
+
+**Optimized Query:**
+```sql
+-- ✅ Uses (chat_id, created_at) index
+SELECT * FROM messages 
+WHERE chat_id = 456 
+ORDER BY created_at ASC;
+```
+
+#### **users** Table
+
+| Index | Type | Columns | Purpose | Query Pattern |
+|-------|------|---------|---------|---------------|
+| PRIMARY | B-tree | `id` | Unique identification | `WHERE id = ?` |
+| UNIQUE | B-tree | `email` | Prevent duplicate emails | `WHERE email = ?` (login) |
+
+#### **languages** Table
+
+| Index | Type | Columns | Purpose | Query Pattern |
+|-------|------|---------|---------|---------------|
+| PRIMARY | B-tree | `id` | Unique identification | `WHERE id = ?` |
+| UNIQUE | B-tree | `name` | Prevent duplicate languages | `WHERE name = ?` |
+
+---
+
+### Index Performance Metrics
+
+#### Storage Overhead
+- **B-tree Index Size**: ~10-20% of table size per index
+- **Our Schema**: 5 composite indexes + 5 primary keys + 2 unique indexes
+- **Estimated Overhead**: ~30-40% additional storage
+- **Trade-off**: ✅ Worth it for query performance
+
+#### Write Performance Impact
+- **INSERT**: Must update all indexes → Slight slowdown
+- **UPDATE**: Only updates affected indexes
+- **DELETE**: Must update all indexes → Slight slowdown
+
+**Mitigation Strategies:**
+- Batch inserts when possible
+- Use transactions for multiple operations
+- Indexes are on frequently queried columns (read-heavy workload)
+
+#### Query Performance Gains
+
+| Operation | Without Indexes | With Indexes | Improvement |
+|-----------|-----------------|--------------|-------------|
+| Find user by email | O(n) | O(log n) | **100-1000x faster** |
+| Paginate generations | O(n) | O(log n + k) | **50-500x faster** |
+| Load chat messages | O(n) | O(log n + k) | **50-500x faster** |
+| Join generations with users | O(n²) | O(n log n) | **10-100x faster** |
+
+---
+
+### Best Practices Implemented
+
+✅ **Composite indexes match query patterns**
+- `(user_id, created_at)` for user-specific time-sorted queries
+- `(chat_id, created_at)` for chronological message retrieval
+
+✅ **Unique indexes for business constraints**
+- Email uniqueness for user accounts
+- Language name uniqueness
+
+✅ **Foreign key indexes**
+- All foreign keys have indexes for JOIN performance
+
+✅ **Timestamp indexes**
+- Support chronological sorting and filtering
+
+✅ **Avoid over-indexing**
+- Only index columns used in WHERE, ORDER BY, or JOIN
+- No indexes on low-cardinality columns (e.g., role: "user"/"assistant")
+
+
 ## 🚀 Getting Started
 
 ### Prerequisites
