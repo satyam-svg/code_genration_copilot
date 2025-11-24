@@ -1,38 +1,473 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Code Generation Copilot 🚀
 
-## Getting Started
+An AI-powered code generation platform that leverages Google's Gemini API to generate code in multiple programming languages. Built with Next.js frontend and Go backend, featuring real-time chat-based code generation with conversation history.
 
-go run github.com/steebchen/prisma-client-go migrate dev --name your_change_name
+## 📋 Table of Contents
 
-First, run the development server:
+- [Features](#features)
+- [Tech Stack](#tech-stack)
+- [Architecture](#architecture)
+- [Database Schema](#database-schema)
+- [Getting Started](#getting-started)
+- [API Documentation](#api-documentation)
+- [Environment Variables](#environment-variables)
+- [Deployment](#deployment)
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+## ✨ Features
+
+- **AI-Powered Code Generation**: Generate code using Google Gemini API
+- **Multi-Language Support**: Support for multiple programming languages
+- **Chat-Based Interface**: Conversational UI similar to ChatGPT
+- **Conversation History**: Save and retrieve previous chat sessions
+- **User Authentication**: Secure JWT-based authentication
+- **Syntax Highlighting**: Beautiful code display with syntax highlighting
+- **Copy to Clipboard**: Easy code copying with toast notifications
+- **Responsive Design**: Modern, premium UI that works on all devices
+
+## 🛠️ Tech Stack
+
+### Frontend
+- **Framework**: Next.js 16 (React 19)
+- **Language**: TypeScript
+- **Styling**: Tailwind CSS 4
+- **UI Components**: Custom components with Lucide icons
+- **Code Highlighting**: react-syntax-highlighter
+- **Notifications**: react-hot-toast
+
+### Backend
+- **Language**: Go 1.24
+- **Web Framework**: Fiber v2
+- **Database**: PostgreSQL
+- **ORM**: Prisma Client Go
+- **Authentication**: JWT (golang-jwt/jwt)
+- **AI Integration**: Google Generative AI Go SDK
+- **Password Hashing**: bcrypt (golang.org/x/crypto)
+
+## 🏗️ Architecture
+
+```
+code-generation/
+├── app/                    # Next.js app directory
+├── components/             # React components
+│   ├── AuthForm.tsx       # Login/Signup form
+│   ├── ChatArea.tsx       # Main chat interface
+│   ├── Sidebar.tsx        # Chat history sidebar
+│   ├── Button.tsx         # Reusable button component
+│   └── Icons.tsx          # Icon components
+├── lib/                   # Utility libraries
+│   ├── api.ts            # API client & auth service
+│   └── config.ts         # API configuration
+├── backend/              # Go backend
+│   ├── cmd/api/         # Application entry point
+│   │   └── main.go      # Server initialization
+│   ├── internal/        # Internal packages
+│   │   ├── auth/        # JWT authentication
+│   │   ├── database/    # Database operations
+│   │   ├── handlers/    # HTTP handlers
+│   │   ├── middleware/  # HTTP middleware
+│   │   ├── routes/      # Route definitions
+│   │   └── server/      # Server setup
+│   └── prisma/          # Database schema & migrations
+│       └── schema.prisma
+└── public/              # Static assets
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## 🗄️ Database Schema
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### ER Diagram
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+![ER Diagram](C:/Users/satya/.gemini/antigravity/brain/b1ea3c7e-7634-49c7-942f-74fa8725bfea/er_diagram_schema_1763944519091.png)
 
-## Learn More
+### Tables
 
-To learn more about Next.js, take a look at the following resources:
+#### **users**
+Stores user account information.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+| Column     | Type     | Constraints           | Description                |
+|------------|----------|-----------------------|----------------------------|
+| id         | INT      | PRIMARY KEY, AUTO_INC | Unique user identifier     |
+| name       | STRING   | NOT NULL              | User's full name           |
+| email      | STRING   | UNIQUE, NOT NULL      | User's email address       |
+| password   | STRING   | NOT NULL              | Hashed password (bcrypt)   |
+| created_at | DATETIME | DEFAULT NOW()         | Account creation timestamp |
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+**Relationships:**
+- One-to-Many with `generations` (optional, can be null)
+- One-to-Many with `chats` (cascade delete)
 
-## Deploy on Vercel
+---
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+#### **languages**
+Stores supported programming languages.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+| Column | Type   | Constraints           | Description                    |
+|--------|--------|-----------------------|--------------------------------|
+| id     | INT    | PRIMARY KEY, AUTO_INC | Unique language identifier     |
+| name   | STRING | UNIQUE, NOT NULL      | Language name (e.g., "Python") |
+
+**Relationships:**
+- One-to-Many with `generations` (restrict delete)
+
+---
+
+#### **generations**
+Stores individual code generation requests and results.
+
+| Column      | Type     | Constraints           | Description                  |
+|-------------|----------|-----------------------|------------------------------|
+| id          | INT      | PRIMARY KEY, AUTO_INC | Unique generation identifier |
+| prompt      | STRING   | NOT NULL              | User's code request prompt   |
+| code        | TEXT     | NOT NULL              | Generated code               |
+| created_at  | DATETIME | DEFAULT NOW()         | Generation timestamp         |
+| user_id     | INT      | FOREIGN KEY (nullable)| Reference to users.id        |
+| language_id | INT      | FOREIGN KEY, NOT NULL | Reference to languages.id    |
+
+**Indexes:**
+- `created_at`
+- `language_id, created_at`
+- `user_id, created_at`
+
+**Relationships:**
+- Many-to-One with `users` (optional, SET NULL on delete)
+- Many-to-One with `languages` (required, RESTRICT on delete)
+
+---
+
+#### **chats**
+Stores chat sessions for conversation history.
+
+| Column     | Type     | Constraints           | Description                |
+|------------|----------|-----------------------|----------------------------|
+| id         | INT      | PRIMARY KEY, AUTO_INC | Unique chat identifier     |
+| title      | STRING   | DEFAULT "New Chat"    | Chat session title         |
+| user_id    | INT      | FOREIGN KEY, NOT NULL | Reference to users.id      |
+| created_at | DATETIME | DEFAULT NOW()         | Chat creation timestamp    |
+| updated_at | DATETIME | AUTO UPDATE           | Last message timestamp     |
+
+**Indexes:**
+- `user_id, updated_at`
+
+**Relationships:**
+- Many-to-One with `users` (required, CASCADE on delete)
+- One-to-Many with `messages` (cascade delete)
+
+---
+
+#### **messages**
+Stores individual messages within chat sessions.
+
+| Column     | Type     | Constraints           | Description                        |
+|------------|----------|-----------------------|------------------------------------|
+| id         | INT      | PRIMARY KEY, AUTO_INC | Unique message identifier          |
+| chat_id    | INT      | FOREIGN KEY, NOT NULL | Reference to chats.id              |
+| role       | STRING   | NOT NULL              | "user" or "assistant"              |
+| content    | TEXT     | NOT NULL              | Message content/code               |
+| language   | STRING   | NULLABLE              | Programming language (if code)     |
+| created_at | DATETIME | DEFAULT NOW()         | Message timestamp                  |
+
+**Indexes:**
+- `chat_id, created_at`
+
+**Relationships:**
+- Many-to-One with `chats` (required, CASCADE on delete)
+
+---
+
+### Schema Principles
+
+✅ **Normalization**: Schema follows 3NF (Third Normal Form)
+- No redundant data storage
+- Separate tables for distinct entities
+- Proper use of foreign keys
+
+✅ **Referential Integrity**
+- All foreign keys properly defined
+- Appropriate cascade/restrict rules
+- Optional vs required relationships clearly defined
+
+✅ **Indexing Strategy**
+- Primary keys on all tables
+- Unique constraints on email and language names
+- Composite indexes for common query patterns
+- Timestamp-based indexes for chronological queries
+
+✅ **Data Types**
+- Appropriate types for each field
+- TEXT for potentially large content
+- DATETIME for temporal data
+- INT for identifiers
+
+## 🚀 Getting Started
+
+### Prerequisites
+
+- Node.js 20+ and npm
+- Go 1.24+
+- PostgreSQL database
+- Google Gemini API key
+
+### Installation
+
+1. **Clone the repository**
+   ```bash
+   git clone <repository-url>
+   cd code-generation
+   ```
+
+2. **Install frontend dependencies**
+   ```bash
+   npm install
+   ```
+
+3. **Set up backend**
+   ```bash
+   cd backend
+   go mod download
+   ```
+
+4. **Configure environment variables**
+   
+   Create `.env` file in the `backend` directory:
+   ```env
+   DATABASE_URL="postgresql://user:password@localhost:5432/codegen?schema=public"
+   JWT_SECRET="your-super-secret-jwt-key"
+   GEMINI_API_KEY="your-gemini-api-key"
+   PORT=8080
+   ```
+
+   Create `.env.local` file in the root directory:
+   ```env
+   NEXT_PUBLIC_API_BASE_URL=http://localhost:8080
+   ```
+
+5. **Run database migrations**
+   ```bash
+   cd backend
+   go run github.com/steebchen/prisma-client-go migrate dev --name init
+   ```
+
+6. **Start the backend server**
+   ```bash
+   cd backend
+   go run cmd/api/main.go
+   ```
+
+7. **Start the frontend development server**
+   ```bash
+   npm run dev
+   ```
+
+8. **Open your browser**
+   
+   Navigate to [http://localhost:3000](http://localhost:3000)
+
+## 📡 API Documentation
+
+### Base URL
+```
+Development: http://localhost:8080
+Production: https://your-backend-url.com
+```
+
+### Authentication
+
+All protected endpoints require a JWT token in the Authorization header:
+```
+Authorization: Bearer <your-jwt-token>
+```
+
+### Endpoints
+
+#### **POST** `/api/auth/signup`
+Create a new user account.
+
+**Request Body:**
+```json
+{
+  "name": "John Doe",
+  "email": "john@example.com",
+  "password": "securePassword123"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "User created successfully",
+  "data": {
+    "user": {
+      "id": 1,
+      "name": "John Doe",
+      "email": "john@example.com",
+      "createdAt": "2024-01-01T00:00:00Z"
+    },
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+  }
+}
+```
+
+---
+
+#### **POST** `/api/auth/login`
+Authenticate an existing user.
+
+**Request Body:**
+```json
+{
+  "email": "john@example.com",
+  "password": "securePassword123"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Login successful",
+  "data": {
+    "user": {
+      "id": 1,
+      "name": "John Doe",
+      "email": "john@example.com",
+      "createdAt": "2024-01-01T00:00:00Z"
+    },
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+  }
+}
+```
+
+---
+
+#### **POST** `/api/generate` 🔒
+Generate code using AI (requires authentication).
+
+**Request Body:**
+```json
+{
+  "prompt": "Create a function to calculate factorial",
+  "language": "python",
+  "chatId": 1
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "code": "def factorial(n):\n    if n == 0 or n == 1:\n        return 1\n    return n * factorial(n - 1)",
+    "language": "python",
+    "chatId": 1,
+    "messageId": 42
+  }
+}
+```
+
+---
+
+#### **GET** `/api/chats` 🔒
+Get all chat sessions for the authenticated user.
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": 1,
+      "title": "Python Functions",
+      "createdAt": "2024-01-01T00:00:00Z",
+      "updatedAt": "2024-01-01T01:00:00Z"
+    }
+  ]
+}
+```
+
+---
+
+#### **GET** `/api/chats/:id` 🔒
+Get a specific chat with all messages.
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "id": 1,
+    "title": "Python Functions",
+    "messages": [
+      {
+        "id": 1,
+        "role": "user",
+        "content": "Create a factorial function",
+        "language": null,
+        "createdAt": "2024-01-01T00:00:00Z"
+      },
+      {
+        "id": 2,
+        "role": "assistant",
+        "content": "def factorial(n):\n    ...",
+        "language": "python",
+        "createdAt": "2024-01-01T00:00:01Z"
+      }
+    ]
+  }
+}
+```
+
+## 🔐 Environment Variables
+
+### Frontend (.env.local)
+
+| Variable                    | Description                  | Example                      |
+|-----------------------------|------------------------------|------------------------------|
+| `NEXT_PUBLIC_API_BASE_URL` | Backend API base URL         | `http://localhost:8080`      |
+
+### Backend (.env)
+
+| Variable        | Description                      | Example                                          |
+|-----------------|----------------------------------|--------------------------------------------------|
+| `DATABASE_URL`  | PostgreSQL connection string     | `postgresql://user:pass@localhost:5432/codegen` |
+| `JWT_SECRET`    | Secret key for JWT signing       | `your-super-secret-key-change-in-production`    |
+| `GEMINI_API_KEY`| Google Gemini API key            | `AIzaSy...`                                     |
+| `PORT`          | Server port (optional)           | `8080`                                          |
+
+## 🌐 Deployment
+
+### Frontend (Vercel)
+
+1. Push your code to GitHub
+2. Import project in Vercel
+3. Add environment variable: `NEXT_PUBLIC_API_BASE_URL`
+4. Deploy
+
+### Backend (Render/Railway/Fly.io)
+
+1. **Build Command:**
+   ```bash
+   go build -o bin/server cmd/api/main.go
+   ```
+
+2. **Start Command:**
+   ```bash
+   ./bin/server
+   ```
+
+3. **Environment Variables:**
+   Set all backend environment variables in your hosting platform
+
+4. **Database:**
+   Use a managed PostgreSQL instance (e.g., Render PostgreSQL, Supabase)
+
+## 📝 License
+
+This project is licensed under the MIT License.
+
+## 🤝 Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+---
+
+**Built with ❤️ using Next.js, Go, and Google Gemini AI**
